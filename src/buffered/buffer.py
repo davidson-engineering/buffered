@@ -47,6 +47,9 @@ class Buffer:
             pass
         self.buffer.append(data)
 
+    def append(self, data):
+        self.add(data)
+
     def reinsert(self, data):
         if isinstance(data[0], list):
             self.buffer.extendleft(data)
