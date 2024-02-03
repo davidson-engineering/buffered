@@ -1,8 +1,6 @@
 from collections import deque
-from datetime import datetime, timezone
 import logging
 from copy import deepcopy
-
 
 from buffered.packager import Packager, SeparatorPackager, JSONPackager
 
@@ -10,6 +8,33 @@ logger = logging.getLogger(__name__)
 
 
 class Buffer:
+    """
+    A buffer class that stores data in a deque
+
+    Example:
+    >>> buffer = Buffer()
+    >>> buffer.add(1)
+    >>> buffer.add(2)
+    >>> buffer.add(3)
+    >>> buffer.add(4)
+    >>> buffer.add(5)
+    >>> buffer
+    Buffer(deque([1, 2, 3, 4, 5], maxlen=4096))
+    >>> buffer.get_copy()
+    Buffer(deque([1, 2, 3, 4, 5], maxlen=4096))
+    >>> buffer.get_size()
+    5
+    >>> buffer.not_empty()
+    True
+    >>> buffer.dump()
+    [1, 2, 3, 4, 5]
+    >>> buffer.peek()
+    [1, 2, 3, 4, 5]
+    >>> buffer.peek(2)
+    3
+
+    """
+
     def __init__(self, data=None, maxlen=4096):
         data = data or []
         self.buffer = deque(data, maxlen=maxlen)

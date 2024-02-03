@@ -1,5 +1,5 @@
-# project_name
-### project_summary
+# buffered
+### A set of containers useful for queues and networking.
 
 project description
 
