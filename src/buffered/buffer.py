@@ -68,10 +68,12 @@ class Buffer:
     def not_empty(self):
         return len(self.buffer) > 0
 
-    def dump(self):
-        buffer = list(self.buffer)
-        self.clear()
-        return buffer
+    def dump(self, maximum=None):
+        maximum = maximum or len(self.buffer)
+        return [
+            self.buffer.popleft()
+            for _ in range(min(maximum, len(self.buffer)))
+        ]
 
     def peek(self, idx=None):
         if idx:
@@ -133,12 +135,16 @@ class PackagedBuffer(Buffer):
         next_data = self.buffer.popleft()
         return self.packager.unpack(next_data)
 
-    def dump(self):
-        packages = []
-        while self.not_empty():
-            package = self.pack_next()
-            packages.append(package)
-        return packages
+    def unpack_next(self):
+        next_data = self.buffer.popleft()
+        return self.packager.unpack(next_data)
+
+    def dump(self, maximum=None):
+        maximum = maximum or len(self.buffer)
+        return [
+            self.unpack_next()
+            for _ in range(min(maximum, len(self.buffer)))
+        ]
 
     def unpack_all(self):
         data = []
