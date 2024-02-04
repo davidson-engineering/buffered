@@ -51,9 +51,11 @@ class Buffer:
         self.add(data)
 
     def reinsert(self, data):
-        if isinstance(data[0], list):
-            self.buffer.extendleft(data)
-        else:
+        try:
+            if isinstance(data[0], list):
+                self.buffer.extendleft(data)
+        except TypeError:
+            pass
             self.buffer.appendleft(data)
 
     def clear(self):
@@ -70,13 +72,10 @@ class Buffer:
 
     def dump(self, maximum=None):
         maximum = maximum or len(self.buffer)
-        return [
-            self.buffer.popleft()
-            for _ in range(min(maximum, len(self.buffer)))
-        ]
+        return [self.buffer.popleft() for _ in range(min(maximum, len(self.buffer)))]
 
     def peek(self, idx=None):
-        if idx:
+        if idx is not None:
             return self.buffer[idx]
         return list(self.buffer)
 
@@ -108,7 +107,7 @@ class PackagedBuffer(Buffer):
         data=None,
         packager: Packager = None,
         maxlen=4096,
-        terminator=b"\0",
+        terminator="\0",
     ):
         data = data or []
         super().__init__(data, maxlen=maxlen)
@@ -116,129 +115,107 @@ class PackagedBuffer(Buffer):
         self.terminator = terminator
         self.len_terminator = len(terminator)
 
-    def pack(self, data):
+    def _pack(self, data, terminate=True):
         if self.packager:
-            return self.packager.pack(data)
+            return self.packager.pack(data, terminate)
         return data
 
-    def unpack(self, data):
+    def _unpack(self, data):
         if self.packager:
             return self.packager.unpack(data)
         return data
 
-    def pack_next(self, terminate=True):
-        next_data = self.buffer.popleft()
+    def next_packed(self, terminate=True):
+        next_data = next(self)
         # pack the next data before returning it
         return self.packager.pack(next_data, terminate)
 
-    def unpack_next(self):
-        next_data = self.buffer.popleft()
+    def next_unpacked(self):
+        next_data = next(self)
         return self.packager.unpack(next_data)
 
-    def unpack_next(self):
-        next_data = self.buffer.popleft()
-        return self.packager.unpack(next_data)
-
-    def dump(self, maximum=None):
+    def _dump_with_func(self, next_func, maximum=None):
         maximum = maximum or len(self.buffer)
-        return [
-            self.unpack_next()
-            for _ in range(min(maximum, len(self.buffer)))
-        ]
+        dump_length = min(maximum, len(self.buffer))
+        return [next_func() for _ in range(dump_length)]
 
-    def unpack_all(self):
-        data = []
-        for package in self.dump():
-            data.extend(self.packager.unpack(package))
-        return data
+    def dump_packed(self, maximum=None):
+        return self._dump_with_func(self.next_packed, maximum)
 
-
-class PacketBuffer(PackagedBuffer):
-    def __init__(
-        self,
-        data=None,
-        packager: Packager = None,
-        maxlen=4096,
-        max_packet_size=4096,
-        terminator=b"\0",
-    ):
-        """
-        Packager is a class that packs and unpacks data into a string
-        max_packet_size is the maximum size of a packet
-        terminator is the terminator for the packet
-
-        Example:
-        >>> data = [("cpu", 0.5, 1622555555.0), ("memory", 0.6, 1622555556.0), ("cpu", 0.7, 1622555557.0)]
-        >>> packager = Packager(sep_major="|", sep_minor=":", terminator="\0")
-        >>> packet_buffer = PacketBuffer(data, packager=packager)
-        >>> packet = packet_buffer.next_packet(10)
-        >>> packet
-        b'cpu:0.5:1622555555.0|memory:0.6:1622555556.0|'
-        >>> packet_buffer.decode(packet)
-        [['cpu', '0.5', '1622555555.0'], ['memory', '0.6', '1622555556.0'], ['cpu', '0.7', '1622555557.0']]
-        """
-
-        data = data or []
-        super().__init__(data, maxlen=maxlen)
-        self.packager = packager
-        self.max_packet_size = max_packet_size
-        self.terminator = terminator
-        self.len_terminator = len(terminator)
-
-    def pack_next(self, max_packet_size=None):
-        # If max_packet_size is not specified, use the default value
-        max_packet_size = max_packet_size or self.max_packet_size
-        packet = b""
-        # Get the next package using the PackagedBuffer method
-        data = super().pack_next(terminate=False)
-        # Check if the next package is too large to fit in the specified packet size
-        if len(data) > max_packet_size:
-            raise ValueError(
-                f"Maximum packet size of {max_packet_size} too small. Data is {len(data)} bytes long."
-            )
-        # Check if adding the next package to the packet will exceed the maximum packet size
-        while len(packet) + len(data) + self.len_terminator <= max_packet_size:
-            # Add the next package to the packet
-            packet += data
-            try:
-                # Try get the next package. If there are no more packages, break the loop
-                data = super().pack_next(terminate=False)
-            except IndexError:
-                break
-        else:
-            data = self.unpack(data)
-            self.reinsert(data)
-        # Add the terminator to the packet before returning it
-        return packet + self.terminator
-
-    def dump(self, max_packet_size=None):
-        packets = []
-        while self.not_empty():
-            packet = self.pack_next(max_packet_size)
-            packets.append(packet)
-        return packets
-
-    def unpack_all(self):
-        data = []
-        for packet in self.dump():
-            packet = self.unpack(packet)
-            data.extend(packet)
-        return data
+    def dump_unpacked(self, maximum=None):
+        if isinstance(self.peek(idx=0), list):
+            return self.dump(maximum)
+        return self._dump_with_func(self.next_unpacked, maximum)
 
 
-def test1():
-    data = [(1, 2, 3), (4, 5, 6), (7, 8, 9)]
-    packager = SeparatorPackager(sep_major="|", sep_minor=";")
-    datastream = PacketBuffer(data, packager=packager)
-    print(datastream)
-    packet = datastream.next_packet(1024)
-    print()
-    print(f"{packet} of length{len(packet)}")
-    print(f"unpacked data: {packager.unpack(packet)}")
+# TODO Implement this
+# class PacketOptimizedBuffer(PackagedBuffer):
+#     def __init__(
+#         self,
+#         data=None,
+#         packager: Packager = None,
+#         maxlen=4096,
+#         max_packet_size=4096,
+#         terminator="\0",
+#     ):
+#         """ """
 
-    datastream = PacketBuffer(data, packager=packager)
-    packet = datastream.next_packet(10)
-    print(f"{packet} of length{len(packet)}")
+#         data = data or []
+#         super().__init__(data, maxlen=maxlen)
+#         self.packager = packager
+#         self.max_packet_size = max_packet_size
+#         self.terminator = terminator
+#         self.len_terminator = len(terminator)
+
+#     def next_packed(self, max_packet_size=None):
+#         # If max_packet_size is not specified, use the default value
+#         max_packet_size = max_packet_size or self.max_packet_size
+#         packet = ""
+#         # Get the next package using the PackagedBuffer method
+#         data = super().next_packed(terminate=False)
+#         # Check if the next package is too large to fit in the specified packet size
+#         if len(data) > max_packet_size:
+#             raise ValueError(
+#                 f"Maximum packet size of {max_packet_size} too small. Data is {len(data)} bytes long."
+#             )
+#         # Check if adding the next package to the packet will exceed the maximum packet size
+#         while len(packet) + len(data) + self.len_terminator <= max_packet_size:
+#             # Add the next package to the packet
+#             packet += data
+#             try:
+#                 # Try get the next package. If there are no more packages, break the loop
+#                 data = super().next_packed(terminate=False)
+#             except IndexError:
+#                 break
+#         else:
+#             data = self._unpack(data)
+#             self.reinsert(data)
+#         # Add the terminator to the packet before returning it
+#         return packet + self.terminator
+
+#     def dump_packed(self, max_packet_size=None):
+#         max_packet_size = max_packet_size or self.max_packet_size
+#         packets = []
+#         packet = self.next_packed(max_packet_size)
+#         while packet:
+#             packets.append(packet)
+#             packet = self.next_packed(max_packet_size)
+#         return packets
+
+
+# def test1():
+#     data = [(1, 2, 3), (4, 5, 6), (7, 8, 9)]
+#     packager = SeparatorPackager(sep_major="|", sep_minor=";")
+#     datastream = PacketOptimizedBuffer(data, packager=packager)
+#     print(datastream)
+#     packet = datastream.next_packet(1024)
+#     print()
+#     print(f"{packet} of length{len(packet)}")
+#     print(f"unpacked data: {packager.unpack(packet)}")
+
+#     datastream = PacketOptimizedBuffer(data, packager=packager)
+#     packet = datastream.next_packet(10)
+#     print(f"{packet} of length{len(packet)}")
 
 
 def main():
@@ -256,5 +233,4 @@ def main():
 
 
 if __name__ == "__main__":
-    test1()
     main()

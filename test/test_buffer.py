@@ -1,16 +1,13 @@
-from buffered.buffer import PacketBuffer, PackagedBuffer
+from buffered.buffer import (
+    PackagedBuffer,
+)
 from buffered.packager import (
     SeparatorPackager,
     PicklerPackager,
     JSONPackager,
 )
 
-packager = SeparatorPackager(
-    sep_major="|", sep_minor=":", terminator="\0", encoded=False
-)
-packager_encoded = SeparatorPackager(
-    sep_major="|", sep_minor=":", terminator="\0", encoded=True
-)
+sep_packager = SeparatorPackager(sep_major="|", sep_minor=":", terminator="\0")
 
 pickler_packager = PicklerPackager(terminator=b"\0")
 
@@ -23,21 +20,16 @@ def test_packager_packing():
         ("memory", 0.6, 1622555556.0),
         ("cpu", 0.7, 1622555557.0),
     ]
-    packed_data = packager.pack(data)
+    packed_data = sep_packager.pack(data)
     assert (
         packed_data
         == "cpu:0.5:1622555555.0|memory:0.6:1622555556.0|cpu:0.7:1622555557.0|\0"
-    )
-    packed_data = packager_encoded.pack(data)
-    assert (
-        packed_data
-        == b"cpu:0.5:1622555555.0|memory:0.6:1622555556.0|cpu:0.7:1622555557.0|\0"
     )
 
 
 def test_packager_unpacking():
     data = "cpu:0.5:1622555555.0|memory:0.6:1622555556.0|cpu:0.7:1622555557.0|\0"
-    unpacked_data = packager.unpack(data)
+    unpacked_data = sep_packager.unpack(data)
     assert unpacked_data == [
         ["cpu", "0.5", "1622555555.0"],
         ["memory", "0.6", "1622555556.0"],
@@ -47,7 +39,7 @@ def test_packager_unpacking():
 
 def test_packager_unpacking_long():
     data = "cpu:0.5:1622555555.0|memory:0.6:1622555556.0|cpu:0.7:1622555557.0|cpu:0.5:1622555555.0|memory:0.6:1622555556.0|cpu:0.7:1622555557.0|cpu:0.5:1622555555.0|memory:0.6:1622555556.0|cpu:0.7:1622555557.0|cpu:0.5:1622555555.0|memory:0.6:1622555556.0|cpu:0.7:1622555557.0|cpu:0.5:1622555555.0|memory:0.6:1622555556.0|cpu:0.7:1622555557.0|cpu:0.5:1622555555.0|memory:0.6:1622555556.0|cpu:0.7:1622555557.0|"
-    packed_data = packager.unpack(data)
+    packed_data = sep_packager.unpack(data)
     assert packed_data == [
         ["cpu", "0.5", "1622555555.0"],
         ["memory", "0.6", "1622555556.0"],
@@ -70,60 +62,60 @@ def test_packager_unpacking_long():
     ]
 
 
-def test_packetbuffer():
-    data = [
-        ("cpu", 0.5, 1622555555.0),
-        ("memory", 0.6, 1622555556.0),
-        ("cpu", 0.7, 1622555557.0),
-    ]
-    buffer = PacketBuffer(data, packager=packager_encoded)
-    packets = buffer.get_copy().dump(max_packet_size=49)
-    assert packets == [
-        b"cpu:0.5:1622555555.0|memory:0.6:1622555556.0|\x00",
-        b"cpu:0.7:1622555557.0|\x00",
-    ]
-    packets = buffer.get_copy().dump(max_packet_size=45)
-    assert packets == [
-        b"cpu:0.5:1622555555.0|\x00",
-        b"memory:0.6:1622555556.0|\x00",
-        b"cpu:0.7:1622555557.0|\x00",
-    ]
+# def test_packetbuffer():
+#     data = [
+#         ("cpu", 0.5, 1622555555.0),
+#         ("memory", 0.6, 1622555556.0),
+#         ("cpu", 0.7, 1622555557.0),
+#     ]
+#     buffer = PacketOptimizedBuffer(data, packager=sep_packager)
+#     packets = buffer.get_copy().dump_packed(max_packet_size=49)
+#     assert packets == [
+#         "cpu:0.5:1622555555.0|memory:0.6:1622555556.0|\0",
+#         "cpu:0.7:1622555557.0|\0",
+#     ]
+#     packets = buffer.get_copy().dump(max_packet_size=45)
+#     assert packets == [
+#         "cpu:0.5:1622555555.0|\0",
+#         "memory:0.6:1622555556.0|\0",
+#         "cpu:0.7:1622555557.0|\0",
+#     ]
 
 
-def test_packetbuffer_chunked_long():
-    data = [
-        ("cpu", 0.5, 1622555555.0),
-        ("memory", 0.6, 1622555556.0),
-        ("cpu", 0.7, 1622555557.0),
-        ("cpu", 0.5, 1622555555.0),
-        ("memory", 0.6, 1622555556.0),
-        ("cpu", 0.7, 1622555557.0),
-        ("cpu", 0.5, 1622555555.0),
-        ("memory", 0.6, 1622555556.0),
-        ("cpu", 0.7, 1622555557.0),
-        ("cpu", 0.5, 1622555555.0),
-        ("memory", 0.6, 1622555556.0),
-        ("cpu", 0.7, 1622555557.0),
-        ("cpu", 0.5, 1622555555.0),
-        ("memory", 0.6, 1622555556.0),
-        ("cpu", 0.7, 1622555557.0),
-        ("cpu", 0.5, 1622555555.0),
-        ("memory", 0.6, 1622555556.0),
-        ("cpu", 0.7, 1622555557.0),
-    ]
-    buffer = PacketBuffer(data, packager=packager_encoded)
-    packets = buffer.dump(max_packet_size=50)
-    assert packets == [
-        b"cpu:0.5:1622555555.0|memory:0.6:1622555556.0|\0",
-        b"cpu:0.7:1622555557.0|cpu:0.5:1622555555.0|\0",
-        b"memory:0.6:1622555556.0|cpu:0.7:1622555557.0|\0",
-        b"cpu:0.5:1622555555.0|memory:0.6:1622555556.0|\0",
-        b"cpu:0.7:1622555557.0|cpu:0.5:1622555555.0|\0",
-        b"memory:0.6:1622555556.0|cpu:0.7:1622555557.0|\0",
-        b"cpu:0.5:1622555555.0|memory:0.6:1622555556.0|\0",
-        b"cpu:0.7:1622555557.0|cpu:0.5:1622555555.0|\0",
-        b"memory:0.6:1622555556.0|cpu:0.7:1622555557.0|\0",
-    ]
+# def test_packetbuffer_chunked_long():
+#     data = [
+#         ("cpu", 0.5, 1622555555.0),
+#         ("memory", 0.6, 1622555556.0),
+#         ("cpu", 0.7, 1622555557.0),
+#         ("cpu", 0.5, 1622555555.0),
+#         ("memory", 0.6, 1622555556.0),
+#         ("cpu", 0.7, 1622555557.0),
+#         ("cpu", 0.5, 1622555555.0),
+#         ("memory", 0.6, 1622555556.0),
+#         ("cpu", 0.7, 1622555557.0),
+#         ("cpu", 0.5, 1622555555.0),
+#         ("memory", 0.6, 1622555556.0),
+#         ("cpu", 0.7, 1622555557.0),
+#         ("cpu", 0.5, 1622555555.0),
+#         ("memory", 0.6, 1622555556.0),
+#         ("cpu", 0.7, 1622555557.0),
+#         ("cpu", 0.5, 1622555555.0),
+#         ("memory", 0.6, 1622555556.0),
+#         ("cpu", 0.7, 1622555557.0),
+#     ]
+#     buffer = PacketOptimizedBuffer(data, packager=sep_packager)
+#     packets = buffer.dump(max_packet_size=50)
+#     assert packets == [
+#         b"cpu:0.5:1622555555.0|memory:0.6:1622555556.0|\0",
+#         b"cpu:0.7:1622555557.0|cpu:0.5:1622555555.0|\0",
+#         b"memory:0.6:1622555556.0|cpu:0.7:1622555557.0|\0",
+#         b"cpu:0.5:1622555555.0|memory:0.6:1622555556.0|\0",
+#         b"cpu:0.7:1622555557.0|cpu:0.5:1622555555.0|\0",
+#         b"memory:0.6:1622555556.0|cpu:0.7:1622555557.0|\0",
+#         b"cpu:0.5:1622555555.0|memory:0.6:1622555556.0|\0",
+#         b"cpu:0.7:1622555557.0|cpu:0.5:1622555555.0|\0",
+#         b"memory:0.6:1622555556.0|cpu:0.7:1622555557.0|\0",
+#     ]
 
 
 def test_pickler_tuple():
@@ -156,8 +148,7 @@ def test_json_packager():
     ]
     packed_data = json_packager.pack(data)
     assert (
-        packed_data
-        == b'[["cpu", 0.5, 1622555555.0], ["memory", 0.6, 1622555556.0]]\x00'
+        packed_data == '[["cpu", 0.5, 1622555555.0], ["memory", 0.6, 1622555556.0]]\0'
     )
     unpacked_data = json_packager.unpack(packed_data)
     assert unpacked_data == [["cpu", 0.5, 1622555555.0], ["memory", 0.6, 1622555556.0]]
@@ -171,7 +162,7 @@ def test_json_packager_dict():
     packed_data = json_packager.pack(data)
     assert (
         packed_data
-        == b'[{"cpu": 0.5, "memory": 0.6, "time": 1622555555.0}, {"cpu": 0.7, "memory": 0.8, "time": 1622555556.0}]\x00'
+        == '[{"cpu": 0.5, "memory": 0.6, "time": 1622555555.0}, {"cpu": 0.7, "memory": 0.8, "time": 1622555556.0}]\x00'
     )
     unpacked_data = json_packager.unpack(packed_data)
     assert unpacked_data == [
@@ -186,18 +177,74 @@ def test_packaged_buffer():
         ("memory", 0.6, 1622555556.0),
         ("cpu", 0.7, 1622555557.0),
     ]
-    buffer = PackagedBuffer(data, packager=packager_encoded)
+    buffer = PackagedBuffer(data, packager=sep_packager)
     packages = buffer.get_copy().dump()
     assert packages == [
-        b"cpu:0.5:1622555555.0|\x00",
-        b"memory:0.6:1622555556.0|\x00",
-        b"cpu:0.7:1622555557.0|\x00",
+        "cpu:0.5:1622555555.0|\0",
+        "memory:0.6:1622555556.0|\0",
+        "cpu:0.7:1622555557.0|\0",
     ]
     buffer.add(("cpu", 0.8, 1622555558.0))
     packets = buffer.get_copy().dump()
     assert packets == [
-        b"cpu:0.5:1622555555.0|\x00",
-        b"memory:0.6:1622555556.0|\x00",
-        b"cpu:0.7:1622555557.0|\x00",
-        b"cpu:0.8:1622555558.0|\x00",
+        "cpu:0.5:1622555555.0|\0",
+        "memory:0.6:1622555556.0|\0",
+        "cpu:0.7:1622555557.0|\0",
+        "cpu:0.8:1622555558.0|\0",
+    ]
+
+
+# TODO - fix this test
+def test_packaged_buffer():
+    data = [
+        ["cpu", 0.5, 1622555555.0],
+        ["memory", 0.6, 1622555556.0],
+        ["cpu", 0.7, 1622555557.0],
+    ]
+    buffer = PackagedBuffer(data, packager=sep_packager)
+    packed = buffer.get_copy().dump_packed()
+    assert packed == [
+        "cpu:0.5:1622555555.0|\x00",
+        "memory:0.6:1622555556.0|\x00",
+        "cpu:0.7:1622555557.0|\x00",
+    ]
+    buffer.add(["cpu", 0.8, 1622555558.0])
+    unpacked = buffer.get_copy().dump_unpacked()
+    assert unpacked == [
+        ["cpu", 0.5, 1622555555.0],
+        ["memory", 0.6, 1622555556.0],
+        ["cpu", 0.7, 1622555557.0],
+        ["cpu", 0.8, 1622555558.0],
+    ]
+    buffer.add(["cpu", 0.9, 1622555559.0])
+    unpacked = buffer.get_copy().dump_unpacked()
+    assert unpacked == [
+        ["cpu", 0.5, 1622555555.0],
+        ["memory", 0.6, 1622555556.0],
+        ["cpu", 0.7, 1622555557.0],
+        ["cpu", 0.8, 1622555558.0],
+        ["cpu", 0.9, 1622555559.0],
+    ]
+    packed = buffer.get_copy().dump_packed()
+    assert packed == [
+        "cpu:0.5:1622555555.0|\x00",
+        "memory:0.6:1622555556.0|\x00",
+        "cpu:0.7:1622555557.0|\x00",
+        "cpu:0.8:1622555558.0|\x00",
+        "cpu:0.9:1622555559.0|\x00",
+    ]
+
+    data = [
+        "cpu:0.5:1622555555.0|\0",
+        "memory:0.6:1622555556.0|\0",
+        "cpu:0.7:1622555557.0|\0",
+        "cpu:0.8:1622555558.0|\0",
+    ]
+    buffer = PackagedBuffer(data, packager=sep_packager)
+    unpacked = buffer.get_copy().dump_unpacked()
+    assert unpacked == [
+        ["cpu", "0.5", "1622555555.0"],
+        ["memory", "0.6", "1622555556.0"],
+        ["cpu", "0.7", "1622555557.0"],
+        ["cpu", "0.8", "1622555558.0"],
     ]
