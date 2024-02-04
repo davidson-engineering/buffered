@@ -43,7 +43,7 @@ class Buffer:
         try:
             if isinstance(data[0], list):
                 self.buffer.extend(data)
-        except TypeError:
+        except (TypeError, KeyError):
             pass
         self.buffer.append(data)
 
@@ -54,7 +54,7 @@ class Buffer:
         try:
             if isinstance(data[0], list):
                 self.buffer.extendleft(data)
-        except TypeError:
+        except (TypeError, KeyError):
             pass
             self.buffer.appendleft(data)
 
