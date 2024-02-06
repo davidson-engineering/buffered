@@ -107,7 +107,7 @@ class PackagedBuffer(Buffer):
         data=None,
         packager: Packager = None,
         maxlen=4096,
-        terminator="\0",
+        terminator="\n",
     ):
         data = data or []
         super().__init__(data, maxlen=maxlen)

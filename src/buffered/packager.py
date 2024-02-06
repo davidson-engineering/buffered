@@ -4,7 +4,7 @@ import json
 
 
 class Packager(ABC):
-    def __init__(self, terminator="\0"):
+    def __init__(self, terminator="\n"):
         self.terminator = terminator
 
     @abstractmethod
@@ -15,7 +15,7 @@ class Packager(ABC):
 
 
 class SeparatorPackager(Packager):
-    def __init__(self, sep_major="|", sep_minor=";", terminator="\0"):
+    def __init__(self, sep_major="|", sep_minor=";", terminator="\n"):
         """ """
         super().__init__(terminator)
         # Set the major and minor separators
