@@ -1,151 +1,167 @@
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
+# ----------------------------------------------------------------------------
+# Created By  : Matthew Davidson
+# Created Date: 2024-02-02
+# Copyright © 2024 Davidson Engineering Ltd.
+# ---------------------------------------------------------------------------
+"""
+Buffered package.
+
+This package provides a set of classes for buffering data.
+
+The Buffer class is a simple buffer that stores data in a deque.
+
+"""
+# ---------------------------------------------------------------------------
+
 from collections import deque
 import logging
 from copy import deepcopy
+from typing import Any, Callable, Optional
 
-from buffered.packager import Packager, SeparatorPackager, JSONPackager
+from buffered.packager import Packager, JSONPackager
 
 logger = logging.getLogger(__name__)
 
 
-class Buffer:
+class Buffer(deque):
     """
     A buffer class that stores data in a deque
 
-    Example:
-    >>> buffer = Buffer()
-    >>> buffer.add(1)
-    >>> buffer.add(2)
-    >>> buffer.add(3)
-    >>> buffer.add(4)
-    >>> buffer.add(5)
-    >>> buffer
-    Buffer(deque([1, 2, 3, 4, 5], maxlen=4096))
-    >>> buffer.get_copy()
-    Buffer(deque([1, 2, 3, 4, 5], maxlen=4096))
-    >>> buffer.get_size()
-    5
-    >>> buffer.not_empty()
-    True
-    >>> buffer.dump()
-    [1, 2, 3, 4, 5]
-    >>> buffer.peek()
-    [1, 2, 3, 4, 5]
-    >>> buffer.peek(2)
-    3
+    Args:
+        data (list, tuple, set, dict, optional): Data to initialize the buffer with. Defaults to None.
+        maxlen (int, optional): The maximum length of the buffer. Defaults to 4096.
 
     """
 
-    def __init__(self, data=None, maxlen=4096):
+    def __init__(self, data: Optional[Any] = None, maxlen: int = 4096) -> None:
         data = data or []
-        self.buffer = deque(data, maxlen=maxlen)
+        super().__init__(data, maxlen=maxlen)
 
-    def add(self, data):
-        try:
-            if isinstance(data[0], list):
-                self.buffer.extend(data)
-        except (TypeError, KeyError):
-            pass
-        self.buffer.append(data)
+    def _append(self, data: Any, _append_func: Callable) -> None:
+        if isinstance(data, (list, tuple, set)):
+            try:
+                if isinstance(data[0], (list, tuple, set, dict)):
+                    # If data is a list of lists, add each list to the buffer
+                    for el in data:
+                        _append_func(el)
+                elif isinstance(data[0], (int, float, str)):
+                    # If data is a list of non-lists, add the list to the buffer
+                    _append_func(data)
+            except (KeyError, ValueError):
+                _append_func(data)
+        else:
+            _append_func(data)
 
-    def append(self, data):
-        self.add(data)
+    def put(self, data: Any) -> None:
+        self._append(data, self.append)
 
-    def reinsert(self, data):
-        try:
-            if isinstance(data[0], list):
-                self.buffer.extendleft(data)
-        except (TypeError, KeyError):
-            pass
-            self.buffer.appendleft(data)
+    def putback(self, data: Any) -> None:
+        self._append(data, self.appendleft)
 
-    def clear(self):
-        self.buffer.clear()
+    def get(self, index: Optional[int] = None) -> Any:
+        if self.empty():
+            return None
+        if index is not None and index > 0:
+            try:
+                item = self[index]
+                self.remove(item)
+                return item
+            except IndexError as e:
+                raise IndexError("Index is out of range") from e
+        else:
+            try:
+                return self.popleft()
+            except IndexError:
+                return None
 
-    def get_copy(self):
+    def copy(self) -> "Buffer":
         return deepcopy(self)
 
-    def get_size(self):
-        return len(self.buffer)
+    def size(self) -> int:
+        return len(self)
 
-    def not_empty(self):
-        return len(self.buffer) > 0
+    def not_empty(self) -> bool:
+        return self.size() > 0
 
-    def dump(self, maximum=None):
-        maximum = maximum or len(self.buffer)
-        return [self.buffer.popleft() for _ in range(min(maximum, len(self.buffer)))]
+    def empty(self) -> bool:
+        return self.size() == 0
 
-    def peek(self, idx=None):
-        if idx is not None:
-            return self.buffer[idx]
-        return list(self.buffer)
+    def dump(self, max: Optional[int] = None) -> list:
+        max = max or self.size()
+        if max == -1:
+            return list(self)
+        length = min(max, self.size())
+        return [self.popleft() for _ in range(length)]
 
-    def __next__(self):
-        return self.buffer.popleft()
+    def peek(self, index: int = 0) -> Any:
+        if self.empty():
+            return None
+        try:
+            return self[index]
+        except IndexError as e:
+            message = f"Index {index} is out of range for buffer of length {len(self)}"
+            logging.error(f"{self.__class__.__name__} peek failed with {message}. {e}")
+            raise IndexError(message) from e
 
-    def __iter__(self):
-        return self
+    def __repr__(self) -> str:
+        try:
+            next_item = self.peek(0)
+            last_item = self.peek(-1)
+        except IndexError:
+            next_item = None
+            last_item = None
+        return f"{self.__class__.__name__}({next_item} ... {last_item}, len={self.size()}/{self.maxlen})"
 
-    def __len__(self):
-        return len(self.buffer)
-
-    def __repr__(self):
-        return f"{self.__class__.__name__}({self.buffer})"
-
-    def __str__(self):
-        return f"{self.__class__.__name__}({self.buffer})"
-
-    def __getitem__(self, index):
-        return self.buffer[index]
-
-    def __setitem__(self, index, value):
-        self.buffer[index] = value
+    def __str__(self) -> str:
+        return self.__repr__()
 
 
 class PackagedBuffer(Buffer):
     def __init__(
         self,
-        data=None,
+        data: Any = None,
         packager: Packager = None,
-        maxlen=4096,
-        terminator="\n",
-    ):
+        maxlen: int = 4096,
+        terminator: str = "\n",
+    ) -> None:
         data = data or []
         super().__init__(data, maxlen=maxlen)
         self.packager = packager or JSONPackager()
         self.terminator = terminator
-        self.len_terminator = len(terminator)
 
-    def _pack(self, data, terminate=True):
+    def _pack(self, data, terminate: bool = True) -> str:
         if self.packager:
             return self.packager.pack(data, terminate)
         return data
 
-    def _unpack(self, data):
+    def _unpack(self, data: Any) -> Any:
         if self.packager:
             return self.packager.unpack(data)
         return data
 
-    def next_packed(self, terminate=True):
-        next_data = next(self)
+    def next_packed(self, terminate: bool = True) -> str:
+        next_data = self.get()
         # pack the next data before returning it
         return self.packager.pack(next_data, terminate)
 
-    def next_unpacked(self):
-        next_data = next(self)
+    def next_unpacked(self) -> Any:
+        next_data = self.get()
         return self.packager.unpack(next_data)
 
-    def _dump_with_func(self, next_func, maximum=None):
-        maximum = maximum or len(self.buffer)
-        dump_length = min(maximum, len(self.buffer))
+    def _dump_with_func(self, next_func: Callable, max: Optional[int] = None) -> list:
+        max = max or len(self)
+        dump_length = min(max, len(self))
         return [next_func() for _ in range(dump_length)]
 
-    def dump_packed(self, maximum=None):
-        return self._dump_with_func(self.next_packed, maximum)
+    def dump_packed(self, max: Optional[int] = None):
+        return self._dump_with_func(self.next_packed, max)
 
-    def dump_unpacked(self, maximum=None):
-        if isinstance(self.peek(idx=0), list):
-            return self.dump(maximum)
-        return self._dump_with_func(self.next_unpacked, maximum)
+    def dump_unpacked(self, max: Optional[int] = None):
+        if isinstance(self.peek(index=0), list):
+            return self.dump(max)
+        return self._dump_with_func(self.next_unpacked, max)
 
 
 # TODO Implement this
