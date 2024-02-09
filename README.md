@@ -19,12 +19,14 @@ print(buffer)
 print(buffer.get(-1))
 print(buffer)
 ```
+<i>Output:</i>
 ```
 1
 Buffer(2 ... 5, len=4/4096)
 5
 Buffer(2 ... 4, len=3/4096)
 ```
+Built in packaging is supported as well.
 ```python
 # Create a packaged buffer with a packager
 from buffered import PackagedBuffer
@@ -46,7 +48,7 @@ print(packaged_buffer)
 print(packaged_buffer_copy)
 print(packaged_buffer_copy.dump_packed())
 ```
-
+<i>Output:</i>
 ```
 PackagedBuffer((1, 2, 3) ... (7, 8, 9), len=3/4096)
 (1, 2, 3)
