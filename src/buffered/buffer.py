@@ -63,7 +63,7 @@ class Buffer(deque):
     def get(self, index: Optional[int] = None) -> Any:
         if self.empty():
             return None
-        if index is not None and index > 0:
+        if index is not None:
             try:
                 item = self[index]
                 self.remove(item)

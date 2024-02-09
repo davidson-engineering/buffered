@@ -7,45 +7,40 @@
 """Example use of the Buffered package."""
 # ---------------------------------------------------------------------------
 
-from buffered.buffer import Buffer, PacketBuffer, PackagedBuffer
-
 
 def main():
 
     # Create a buffer
-    buffer = Buffer()
-    buffer.append(1)
-    buffer.append(2)
-    buffer.append(3)
-    buffer.append(4)
-    buffer.append(5)
-    print(buffer)
-    print(buffer.pop())
-    print(buffer)
-    print(buffer.pop())
-    print(buffer)
+    from buffered import Buffer
 
-    # Create a packet buffer
-    packet_buffer = PacketBuffer()
-    packet_buffer.append((1, 2, 3))
-    packet_buffer.append((4, 5, 6))
-    packet_buffer.append((7, 8, 9))
-    print(packet_buffer)
-    print(packet_buffer.pop())
-    print(packet_buffer)
-    print(packet_buffer.pop())
-    print(packet_buffer)
+    buffer = Buffer()
+    buffer.put(1)
+    buffer.put(2)
+    buffer.put(3)
+    buffer.put(4)
+    buffer.put(5)
+    print(buffer)
+    print(buffer.get())
+    print(buffer)
+    print(buffer.get(-1))
+    print(buffer)
 
     # Create a packaged buffer with a packager
-    from buffered.packager import SeparatorPackager
+    from buffered import PackagedBuffer
+    from buffered import SeparatorPackager
 
     packager = SeparatorPackager(sep_major="|", sep_minor=";")
     packaged_buffer = PackagedBuffer(packager=packager)
-    packaged_buffer.append((1, 2, 3))
-    packaged_buffer.append((4, 5, 6))
-    packaged_buffer.append((7, 8, 9))
+    packaged_buffer.put((1, 2, 3))
+    packaged_buffer.put((4, 5, 6))
+    packaged_buffer.put((7, 8, 9))
     print(packaged_buffer)
-    print(packaged_buffer.pop())
+    print(packaged_buffer.get())
+    print(packaged_buffer)
+    print(packaged_buffer.get(-1))
+    print(packaged_buffer)
+    print(packaged_buffer.dump_packed())
+    print(packaged_buffer)
 
 
 if __name__ == "__main__":
