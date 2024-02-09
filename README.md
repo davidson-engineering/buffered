@@ -38,7 +38,7 @@ print(packaged_buffer)
 ```
 
 ```console
-Buffer(1 ... 5, len=5/4096)
+>> Buffer(1 ... 5, len=5/4096)
 1
 Buffer(2 ... 5, len=4/4096)
 5
