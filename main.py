@@ -34,6 +34,7 @@ def main():
     packaged_buffer.put((1, 2, 3))
     packaged_buffer.put((4, 5, 6))
     packaged_buffer.put((7, 8, 9))
+    packaged_buffer_copy = packaged_buffer.copy()
     print(packaged_buffer)
     print(packaged_buffer.get())
     print(packaged_buffer)
@@ -41,6 +42,8 @@ def main():
     print(packaged_buffer)
     print(packaged_buffer.dump_packed())
     print(packaged_buffer)
+    print(packaged_buffer_copy)
+    print(packaged_buffer_copy.dump_packed())
 
 
 if __name__ == "__main__":
