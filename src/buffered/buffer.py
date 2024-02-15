@@ -19,6 +19,7 @@ from collections import deque
 import logging
 from copy import deepcopy
 from typing import Any, Callable, Optional
+from dataclasses import is_dataclass
 
 from buffered.packager import Packager, JSONPackager
 
@@ -42,13 +43,13 @@ class Buffer(deque):
     def _append(self, data: Any, _append_func: Callable) -> None:
         if isinstance(data, (list, tuple, set)):
             try:
-                if isinstance(data[0], (list, tuple, set, dict)):
-                    # If data is a list of lists, add each list to the buffer
-                    for el in data:
-                        _append_func(el)
-                elif isinstance(data[0], (int, float, str)):
+                if isinstance(data[0], (int, float, str)):
                     # If data is a list of non-lists, add the list to the buffer
                     _append_func(data)
+                else:
+                    # Assume that the data is a list of objects that need to be stored individually
+                    for el in data:
+                        _append_func(el)
             except (KeyError, ValueError):
                 _append_func(data)
         else:

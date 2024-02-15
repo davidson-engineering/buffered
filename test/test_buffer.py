@@ -1,3 +1,11 @@
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
+# ----------------------------------------------------------------------------
+# Created By  : Matthew Davidson
+# Created Date: 2024-02-02
+# Copyright © 2024 Davidson Engineering Ltd.
+# ---------------------------------------------------------------------------
+
 import pytest
 
 from buffered.buffer import Buffer
@@ -197,3 +205,40 @@ def test_buffer_len():
     buffer.put(2)
     buffer.put(3)
     assert len(buffer) == 3
+
+
+def test_buffer_dataclass():
+    from dataclasses import dataclass
+
+    @dataclass
+    class Data:
+        value: int
+
+    buffer = Buffer([Data(1), Data(2), Data(3)])
+    assert buffer.size() == 3
+
+
+def test_buffer_object():
+    class Data:
+        def __init__(self, value):
+            self.value = value
+
+    buffer = Buffer([Data(1), Data(2), Data(3)])
+    assert buffer.size() == 3
+
+
+def test_buffer_strings():
+    string = "hello"
+    buffer = Buffer([string])
+    buffer.put(string)
+    assert buffer.size() == 2
+
+    strings = ["hello"]
+    buffer = Buffer(strings)
+    assert buffer.size() == 1
+    buffer.put(strings)
+    assert buffer.size() == 2
+
+    strings = ["hello", "world"]
+    buffer = Buffer(strings)
+    assert buffer.size() == 2
